@@ -284,3 +284,216 @@ count = length(var.azs)   # 指定した AZ の数だけサブネットを作る
   （例: `alb_log_bucket = "${var.project}-alb-logs-${local.account_id}"` は `project=test` なら `test-alb-logs-…`）
 - 材料を使わず `"30"` のように直接書いた locals は完全な定数
 - 「外から一部だけ変えたい値」は、変えたい部分を variable に切り出して locals の式に埋め込むのが定番
+
+## 13. よく使う AWS サービスと resource の書き方
+
+最小限の書き方の見本。★ はこのリポジトリで実際に使っているもの（場所を併記）。
+属性や必須項目の詳細は Terraform Registry の各リソースのページ（`aws_xxx` で検索）を見る。
+
+### ネットワーク（VPC）★ `terraform/honeypot/network.tf`
+
+```hcl
+resource "aws_vpc" "main" {
+  cidr_block = "10.100.0.0/16"
+}
+
+resource "aws_subnet" "public" {
+  vpc_id            = aws_vpc.main.id          # ← 作った VPC を参照
+  cidr_block        = "10.100.1.0/24"
+  availability_zone = "ap-northeast-1a"
+}
+
+resource "aws_internet_gateway" "main" {
+  vpc_id = aws_vpc.main.id
+}
+```
+
+### セキュリティグループ（ファイアウォール）★ `network.tf`
+
+SG 本体とルールを別リソースで書くのが今の推奨（ルールの追加・削除が他に影響しにくい）。
+
+```hcl
+resource "aws_security_group" "web" {
+  name   = "web"
+  vpc_id = aws_vpc.main.id
+}
+
+resource "aws_vpc_security_group_ingress_rule" "http" {
+  security_group_id = aws_security_group.web.id
+  cidr_ipv4         = "0.0.0.0/0"
+  from_port         = 80
+  to_port           = 80
+  ip_protocol       = "tcp"
+}
+```
+
+### EC2（サーバー）★ `terraform/honeypot/ec2.tf`
+
+```hcl
+resource "aws_instance" "web" {
+  ami                    = data.aws_ssm_parameter.al2023_arm64.value   # 最新 AMI を data で取得
+  instance_type          = var.instance_type
+  subnet_id              = aws_subnet.public.id
+  vpc_security_group_ids = [aws_security_group.web.id]
+  user_data              = file("${path.module}/init.sh")              # 起動時スクリプト
+
+  metadata_options {
+    http_tokens = "required"   # IMDSv2 必須（セキュリティ対策）
+  }
+}
+```
+
+### S3（ファイル置き場）★ `terraform/base/main.tf`、`terraform/bootstrap/main.tf`
+
+provider v4 以降、バケット本体と設定（バージョニング・暗号化・ライフサイクル等）は**別リソース**に分かれている。
+
+```hcl
+resource "aws_s3_bucket" "logs" {
+  bucket = "my-logs-123456789012"   # 全世界で一意な名前が必要
+}
+
+resource "aws_s3_bucket_public_access_block" "logs" {
+  bucket                  = aws_s3_bucket.logs.id
+  block_public_acls       = true
+  block_public_policy     = true
+  ignore_public_acls      = true
+  restrict_public_buckets = true
+}
+
+resource "aws_s3_bucket_versioning" "logs" {
+  bucket = aws_s3_bucket.logs.id
+  versioning_configuration {
+    status = "Enabled"
+  }
+}
+```
+
+### IAM ロール（権限）★ `ec2.tf`、`terraform/bootstrap/main.tf`
+
+「誰が引き受けられるか（信頼ポリシー）」と「何ができるか（権限ポリシー）」の2つで構成。
+
+```hcl
+data "aws_iam_policy_document" "assume" {
+  statement {
+    actions = ["sts:AssumeRole"]
+    principals {
+      type        = "Service"
+      identifiers = ["ec2.amazonaws.com"]   # EC2 が引き受けられる
+    }
+  }
+}
+
+resource "aws_iam_role" "ec2" {
+  name               = "my-ec2-role"
+  assume_role_policy = data.aws_iam_policy_document.assume.json   # 信頼ポリシー
+}
+
+resource "aws_iam_role_policy_attachment" "ssm" {   # 権限ポリシー（AWS 管理ポリシーを付ける）
+  role       = aws_iam_role.ec2.name
+  policy_arn = "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"
+}
+```
+
+### CloudWatch Logs（ログ置き場）★ `terraform/base/main.tf`
+
+```hcl
+resource "aws_cloudwatch_log_group" "app" {
+  name              = "/myapp/access"
+  retention_in_days = 30   # 指定しないと無期限に保存されて課金が続く
+}
+```
+
+### ALB（ロードバランサー）★ `terraform/honeypot/alb.tf`
+
+ALB 本体・ターゲットグループ（転送先）・リスナー（待ち受けポート）の3点セット。
+
+```hcl
+resource "aws_lb" "main" {
+  load_balancer_type = "application"
+  subnets            = aws_subnet.public[*].id   # 2つ以上の AZ のサブネットが必要
+  security_groups    = [aws_security_group.alb.id]
+}
+
+resource "aws_lb_target_group" "web" {
+  port     = 80
+  protocol = "HTTP"
+  vpc_id   = aws_vpc.main.id
+}
+
+resource "aws_lb_listener" "http" {
+  load_balancer_arn = aws_lb.main.arn
+  port              = 80
+  protocol          = "HTTP"
+  default_action {
+    type             = "forward"
+    target_group_arn = aws_lb_target_group.web.arn
+  }
+}
+```
+
+### SNS（通知）と EventBridge（イベントの振り分け）★ `terraform/base/main.tf`
+
+```hcl
+resource "aws_sns_topic" "alerts" {
+  name = "alerts"
+}
+
+resource "aws_sns_topic_subscription" "email" {
+  topic_arn = aws_sns_topic.alerts.arn
+  protocol  = "email"
+  endpoint  = var.alert_email   # 確認メールの Confirm を押すまで届かない
+}
+
+resource "aws_cloudwatch_event_rule" "guardduty" {
+  event_pattern = jsonencode({
+    source      = ["aws.guardduty"]
+    detail-type = ["GuardDuty Finding"]
+  })
+}
+
+resource "aws_cloudwatch_event_target" "to_sns" {
+  rule = aws_cloudwatch_event_rule.guardduty.name
+  arn  = aws_sns_topic.alerts.arn
+}
+```
+
+### このリポジトリでは使っていないが、よく見るもの
+
+```hcl
+# Lambda（サーバーレス関数）
+resource "aws_lambda_function" "hello" {
+  function_name = "hello"
+  role          = aws_iam_role.lambda.arn
+  runtime       = "python3.12"
+  handler       = "app.handler"
+  filename      = "app.zip"
+}
+
+# DynamoDB（NoSQL データベース）
+resource "aws_dynamodb_table" "items" {
+  name         = "items"
+  billing_mode = "PAY_PER_REQUEST"   # 使った分だけ課金
+  hash_key     = "id"
+  attribute {
+    name = "id"
+    type = "S"
+  }
+}
+
+# RDS（リレーショナルデータベース。常時課金なので検証時は注意）
+resource "aws_db_instance" "main" {
+  engine                      = "postgres"
+  instance_class              = "db.t4g.micro"
+  allocated_storage           = 20
+  username                    = "app"
+  manage_master_user_password = true   # パスワードを Secrets Manager に自動管理させる
+  skip_final_snapshot         = true
+}
+```
+
+**書き方の共通パターン**
+
+- `resource "aws_サービス_種類" "名前"` の型名は、ほぼ「AWS のサービス名＋リソース名」（`aws_s3_bucket`、`aws_lb_listener` など）
+- 他のリソースとのつながりは `.id` / `.arn` / `.name` で参照して書く（どれを使うかは受け取る側の項目による）
+- 1つの AWS 機能が複数のリソースに分かれていることが多い（S3 本体と設定、SG とルール、ALB とリスナー）
+- `retention_in_days` や `billing_mode` のように、**指定し忘れると課金が続く項目**がある。学習用は特に注意
