@@ -35,16 +35,23 @@ PC にずっと有効な鍵が残らないため（OIDC と同じ考え方）。
 1. [ ] リージョンを **アジアパシフィック（東京）** に切り替える
 2. [ ] サービス検索で **IAM Identity Center** → **有効にする**
    - 「AWS Organizations で有効にする」を選ぶ（組織が自動で作られ、このアカウントが管理アカウントになる。追加料金なし）
+   - ⚠️ **マルチリージョン（追加リージョンへのレプリケーション）は選ばない。暗号化は「AWS 所有キー」のまま。**
+     有効化の流れでそのまま進むと、カスタマー管理の KMS キー（マルチリージョン、月額課金）と大阪などへのレプリカが作られる。
+     個人の検証では不要。
+   - 間違えて有効にした場合の戻し方（この順番で）:
+     1. IAM Identity Center → 設定 → 追加したリージョン（例: 大阪）を削除
+     2. 設定 → 保管中の暗号化を管理 → **AWS 所有キー** に切り替え
+     3. KMS → カスタマー管理型のキー → `mrk-...` を **レプリカ側のリージョンから** 削除スケジュール（7日）→ 東京でも同じキーを削除スケジュール
 3. [ ] **ユーザーを追加**: ユーザー → ユーザーを追加
-   - ユーザー名: 例 `yamada-admin`、メールアドレス: 自分のアドレス
+   - ユーザー名: `<あなたの名前>-admin`（例 `taro-admin`。以降 `<USER>-admin` と表記）、メールアドレス: 自分のアドレス
    - 「パスワードの設定手順が記載された E メールを送信」を選ぶ → 届いたメールから招待を承諾してパスワード設定
 4. [ ] **許可セットを作る**: 許可セット → 許可セットを作成 → 事前定義された許可セット → **AdministratorAccess**
    - セッション期間: 4 時間程度（長すぎると漏れた時のリスクが大きい）
 5. [ ] **アカウントに割り当てる**: AWS アカウント → 自分のアカウントにチェック → ユーザーまたはグループを割り当て →
-   `yamada-admin` → 許可セット `AdministratorAccess`
+   `<USER>-admin` → 許可セット `AdministratorAccess`
 6. [ ] **MFA を必須にする**: 設定 → 認証 → 多要素認証 → 設定 → 「サインインのたびに」＋「MFA デバイスを登録するよう求める」
-7. [ ] **AWS アクセスポータルの URL を控える**: 設定 → 「AWS アクセスポータルの URL」（`https://d-xxxxxxxxxx.awsapps.com/start` の形）
-8. [ ] ブラウザのシークレットウィンドウでポータル URL を開き、`yamada-admin` でログイン（MFA 登録）→ アカウント → AdministratorAccess → コンソールが開けば OK
+7. [ ] **AWS アクセスポータルの URL を控える**: ダッシュボード右側の「設定の概要」、または 設定 → アイデンティティソース タブにある「AWS アクセスポータルの URL」（`https://d-xxxxxxxxxx.awsapps.com/start` の形。招待メールにも記載）
+8. [ ] ブラウザのシークレットウィンドウでポータル URL を開き、`<USER>-admin` でログイン（MFA 登録）→ アカウント → AdministratorAccess → コンソールが開けば OK
 
 以降、**コンソール作業もこのポータルから入る**。ルートユーザーは請求の最終確認以外では使わない。
 
@@ -81,7 +88,7 @@ aws configure sso
 | SSO start URL | B-7 で控えたポータル URL |
 | SSO region | `ap-northeast-1` |
 | SSO registration scopes | そのまま Enter |
-| （ブラウザが開く） | `yamada-admin` でログインして「許可」 |
+| （ブラウザが開く） | `<USER>-admin` でログインして「許可」 |
 | アカウント／ロール | 自分のアカウント / `AdministratorAccess` |
 | Default client Region | `ap-northeast-1` |
 | CLI default output format | `json` |
@@ -92,7 +99,7 @@ aws configure sso
 $env:AWS_PROFILE = "honeypot-admin"
 aws sts get-caller-identity
 ```
-`Arn` に `assumed-role/AWSReservedSSO_AdministratorAccess_.../yamada-admin` と出れば OK。
+`Arn` に `assumed-role/AWSReservedSSO_AdministratorAccess_.../<USER>-admin` と出れば OK。
 
 **次回以降**: 認証が切れたら `aws sso login --profile honeypot-admin`。PowerShell を開くたびに `$env:AWS_PROFILE = "honeypot-admin"` を設定する。
 
@@ -118,4 +125,5 @@ aws ec2 describe-vpcs --region ap-northeast-1 --query "Vpcs[].CidrBlock"   # 10.
 | `aws configure sso` でブラウザが開かない | 表示された URL とコードを手でブラウザに入力する |
 | `The SSO session associated with this profile has expired` | `aws sso login --profile honeypot-admin` |
 | Cost Explorer / Budgets が「アクセス拒否」 | A の「IAM ユーザー／ロールに請求情報へのアクセスを許可」をルートで実施 |
+| 大阪など別リージョンの Identity Center 画面に「有効にする」ボタンと「東京で設定されています」が出る | 正常。押さずに東京へ切り替える |
 | Identity Center の有効化ボタンが無い | すでに別リージョンで有効化済みの可能性。リージョンを切り替えて探す（1アカウントで1リージョンのみ） |
