@@ -60,6 +60,20 @@ GitHub が**ジョブごとに**「このジョブは <OWNER>/<REPO> の main �
  ⑥ 以降の terraform / aws コマンドはその一時認証情報で動く
 ```
 
+> 📝 **学習メモ: 認証は GitHub がしているのか？**
+> 役割が2つに分かれている。
+>
+> - **GitHub（身分証明書の発行）**: GitHub の OIDC トークン発行サービス（`token.actions.githubusercontent.com`）が、
+>   ジョブごとに「このジョブは〇〇リポジトリの main で動いている」と書いて署名したトークンを発行する（数分で失効）
+> - **AWS（審査と鍵の発行）**: AWS STS がトークンを受け取り、①本当に GitHub の署名か（bootstrap で登録した OIDC プロバイダで検証）、
+>   ②aud と sub がロールの信頼ポリシーの条件に合うか を確認し、OK なら1時間で切れる一時的な AWS の鍵を渡す
+>
+> たとえると GitHub は「社員証を発行する会社」、AWS は「社員証を見て入館証を出す受付」。
+> **入れるかどうかの判断は AWS 側**で行う。GitHub は「誰のジョブか」を保証するだけで AWS の権限は持たないので、
+> GitHub に AWS の鍵を預けずに済む。
+> 初回の whoami が `Not authorized to perform sts:AssumeRoleWithWebIdentity` で失敗したのも、この受付の条件（sub の形式）が合わなかったため（下の「sub の ID 付き形式」参照）。
+> bootstrap の OIDC プロバイダ（GitHub を信頼する設定）とロールの権限は正しく、直したのは信頼ポリシーの sub の文字列だけ。
+
 ### トークンの主なクレーム（OIDC whoami ワークフローで実物を見られる）
 
 | クレーム | 例 | 意味 |
