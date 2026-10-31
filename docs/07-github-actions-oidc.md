@@ -74,6 +74,9 @@ GitHub が**ジョブごとに**「このジョブは <OWNER>/<REPO> の main �
 > 「同名リポジトリを作って他人のロールを引き受ける」攻撃を防げる。信頼ポリシーの sub も同じ形式にする必要があり、
 > bootstrap の `github_owner_id` / `github_repo_id` で設定している（空にすると従来形式）。
 > 最初は従来形式で作って `Not authorized to perform sts:AssumeRoleWithWebIdentity` になった。OIDC whoami で sub を表示して原因が分かった。
+> 背景: GitHub の変更（[Changelog 2026-04-23](https://github.blog/changelog/2026-04-23-immutable-subject-claims-for-github-actions-oidc-tokens)）で、
+> **2026-07-15 以降に作成・改名・移管されたリポジトリは自動でこの形式**になる。それ以前のリポジトリはリポジトリ／Organization の OIDC 設定で opt-in した場合のみ。
+> ID は `gh api repos/<OWNER>/<REPO> --jq '{id, owner_id: .owner.id}'` で確認できる（秘密情報ではない）。
 | `ref` / `event_name` / `actor` | `refs/heads/main` / `workflow_dispatch` / `<OWNER>` | 参考情報 |
 
 ## 3. ロールの分け方（最小権限）
