@@ -145,7 +145,7 @@ GitHub はこのファイルに書かれたコミットのコードだけを実�
 | `Could not load credentials from any providers` | ワークフローに `permissions: id-token: write` が無い / Secrets 名の打ち間違い |
 | `No OpenIDConnect provider found` | OIDC プロバイダが無い。bootstrap を `create_github_oidc_provider = true` で apply |
 | `AccessDenied ... iam:CreateRole` など | apply ロールの権限不足。エラーに出たアクションを `terraform/bootstrap/main.tf` の apply ポリシーに追加して、手元PCで bootstrap を再 apply |
-| ワークフローが「lockfile」関連のエラーで始まらない | ワークフローの `uses:` を変えたのに actions.lock を更新していない。手元で `gh actions-lock` を実行してコミット |
+| ワークフローが lockfile 関連のエラーで失敗する | ワークフローの `uses:` を変えたのに actions.lock を更新していない。手元で `gh actions-lock` を実行してコミット |
 | `Error acquiring the state lock` | 別の実行が動いている、または中断で `.tflock` が残った。他に動いていないことを確認してから、手元PCで `terraform -chdir=terraform/<stack> force-unlock <ID>` |
 
 ## 9. 発展（今回はやらないが学習ネタとして）
