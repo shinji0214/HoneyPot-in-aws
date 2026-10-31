@@ -51,6 +51,14 @@ GitHub リポジトリ → Settings で以下を設定する。
   | `AWS_APPLY_ROLE_ARN` | output `apply_role_arn` |
   | `AWS_EMERGENCY_ROLE_ARN` | output `emergency_role_arn` |
   | `ALERT_EMAIL` | 予算・GuardDuty 通知を受けるメールアドレス |
+  - gh で登録する場合（PowerShell、`terraform/bootstrap` の中で実行）。**パイプ（`|`）は使わない**（BOM が付いて値が壊れる）
+    ```powershell
+    gh secret set TF_STATE_BUCKET        --body (terraform output -raw tf_state_bucket)
+    gh secret set AWS_PLAN_ROLE_ARN      --body (terraform output -raw plan_role_arn)
+    gh secret set AWS_APPLY_ROLE_ARN     --body (terraform output -raw apply_role_arn)
+    gh secret set AWS_EMERGENCY_ROLE_ARN --body (terraform output -raw emergency_role_arn)
+    gh secret set ALERT_EMAIL            # 対話でメールアドレスを入力
+    ```
 - [ ] **Secrets and variables → Actions → Variables**（既定値で良ければ不要）
   | 名前 | 既定 | 意味 |
   |---|---|---|
@@ -77,6 +85,33 @@ GitHub リポジトリ → Settings で以下を設定する。
   > つまり「GitHub 側の承認」と「AWS 側の権限」が sub でつながっていて、承認を通らないジョブはワークフローを書き換えても書き込み権限を得られない。
   > plan ロール（読み取り専用）は承認なしで使える。詳しくは docs/07
 - [ ] **Actions → 接続確認（OIDC whoami） → Run workflow** が成功し、`sub` と `assumed-role/honeypot-gha-plan/...` が表示される（docs/07 の学習ポイント）
+
+## 2.5 リハーサル（本番の前に1回）
+
+本番の48時間観測を始める前に、**3つのワークフロー（構築・削除 / 接続確認 / 緊急隔離）がすべて動くこと**を確認する。
+特に緊急隔離は、本当に必要な時に動かないと困るので必ず通しておく。
+
+所要 1〜2時間。費用は honeypot を動かしている間だけで 10〜20円程度。
+
+| # | やること | 参照 | 確認ポイント |
+|---|---|---|---|
+| 1 | `base` を plan → apply（承認）。通知メールの Confirm subscription を押す | 3章 1〜2 | base は本番でもそのまま使う |
+| 2 | `honeypot` を plan → apply（承認） | 3章 3〜4 | plan に 22番ポートのルールが無いこと |
+| 3 | 動作確認 | 4章 | curl で 200 / 404 / WAF の 403、CloudWatch Logs にログが届く |
+| 4 | **スマホから**緊急隔離を実行（confirm: `ISOLATE`、snapshot: **オフ**） | 4章の「予行演習」 | EC2 が「停止済み」、ALB のターゲットから外れている |
+| 5 | `honeypot` を destroy（承認） | 6章 | 削除ワークフローの確認。base は残す |
+| 6 | 本番: `honeypot` を apply し直す → **ここから48時間** | 3章 3〜4 | 攻撃前のきれいな状態から観測を始める |
+
+- 4 で隔離した EC2 は元に戻さず、5 で消して 6 で作り直す（隔離後に戻すより手間が少なく、本番を新品の状態から始められる）
+- 4 で snapshot をオフにするのは、スナップショットは Terraform 管理外で destroy しても消えないため（本番で使った場合は撤収時に手で削除）
+- 隔離後の destroy は、EC2 の削除完了を待ってから隔離用 SG を消すので時間がかかる。まれに SG の削除がタイムアウトでエラーになったら、destroy をもう一度実行する
+
+**リハーサルで分かったこと（2026-10-31）**
+
+- OIDC whoami が `Not authorized to perform sts:AssumeRoleWithWebIdentity` で失敗 → sub が ID 付き形式だった。bootstrap を修正して再 apply（docs/07）
+- base の plan が `InvalidBucketName`（バケット名の先頭に `\ufeff`）で失敗 → Windows PowerShell で `terraform output | gh secret set` とパイプで渡すと BOM が付く。
+  `gh secret set 名前 --body (terraform output -raw 名前)` で登録し直して解決
+- Actions のログに `Node.js 20 is deprecated` の警告 → 動作には影響なし。観測後に Dependabot の更新 PR で最新化する
 
 ## 3. 構築（GitHub Actions）
 
