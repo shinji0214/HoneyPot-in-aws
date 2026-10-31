@@ -1,0 +1,165 @@
+# base / honeypot スタックの plan・構築・削除を GitHub Actions から行う。
+#
+# 実行: Actions → "Terraform" → Run workflow
+#   stack : base（ログ・GuardDuty・予算） / honeypot（VPC・EC2・ALB・WAF）
+#   action: plan（確認だけ） / apply（構築・変更） / destroy（削除）
+#
+# 流れ:
+#   1. plan ジョブ   … 読み取り専用ロールで plan を作り、結果をジョブのサマリーに出す
+#   2. apply ジョブ  … Environment「honeypot-apply」の承認待ちで止まる → 承認すると apply / destroy
+#
+# 認証は OIDC（アクセスキーなし）。仕組みと初期設定は docs/07-github-actions-oidc.md
+#
+# 構築順: base → honeypot。削除順: honeypot → base（base は分析が終わってから）
+name: Terraform
+
+on:
+  workflow_dispatch:
+    inputs:
+      stack:
+        description: "対象スタック"
+        required: true
+        type: choice
+        options: [honeypot, base]
+      action:
+        description: "plan=確認のみ / apply=構築・変更 / destroy=削除"
+        required: true
+        type: choice
+        options: [plan, apply, destroy]
+
+permissions:
+  id-token: write # OIDC トークンを発行してもらうため（これが無いと AWS に入れない）
+  contents: read
+
+# 同じスタックへの操作は同時に1つまで（state の競合防止）
+concurrency:
+  group: terraform-${{ inputs.stack }}
+  cancel-in-progress: false
+
+env:
+  TF_VERSION: "1.12.2"
+  AWS_REGION: ap-northeast-1
+  TF_IN_AUTOMATION: "true"
+  TF_INPUT: "false"
+  # Terraform 変数（未宣言のスタックでは無視される）
+  TF_VAR_alert_email: ${{ secrets.ALERT_EMAIL }}
+  TF_VAR_enable_guardduty: ${{ vars.ENABLE_GUARDDUTY || 'true' }}
+  TF_VAR_budget_usd: ${{ vars.BUDGET_USD || '6.5' }}
+  TF_VAR_instance_type: ${{ vars.INSTANCE_TYPE || 't4g.nano' }}
+  TF_VAR_expose_ec2_directly: ${{ vars.EXPOSE_EC2_DIRECTLY || 'false' }}
+  TF_VAR_waf_count_mode: ${{ vars.WAF_COUNT_MODE || 'false' }}
+
+jobs:
+  plan:
+    name: plan (${{ inputs.stack }} / ${{ inputs.action }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: terraform/${{ inputs.stack }}
+    steps:
+      - uses: actions/checkout@v4
+
+      # OIDC: GitHub が発行したトークンを AWS STS に渡し、plan ロールの一時認証情報（1時間）をもらう
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_PLAN_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+          mask-aws-account-id: true # public リポジトリのログにアカウントIDを出さない
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+          terraform_wrapper: false
+
+      - name: terraform init
+        run: |
+          terraform init \
+            -backend-config="bucket=${{ secrets.TF_STATE_BUCKET }}" \
+            -backend-config="key=${{ inputs.stack }}/terraform.tfstate" \
+            -backend-config="region=${AWS_REGION}" \
+            -backend-config="use_lockfile=true"
+
+      - name: terraform fmt / validate
+        run: |
+          terraform fmt -check -diff
+          terraform validate -no-color
+
+      # plan ロールは読み取り専用なのでロックは取らない（-lock=false）。書き込みは apply ジョブだけ
+      - name: terraform plan
+        run: |
+          set -o pipefail
+          terraform plan -no-color -lock=false ${{ inputs.action == 'destroy' && '-destroy' || '' }} > plan_raw.txt
+          # ログのマスクはジョブサマリーには効かない場合があるため、アカウントIDを自分で伏せ字にする
+          ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+          sed "s/${ACCOUNT_ID}/************/g" plan_raw.txt > plan.txt
+          rm -f plan_raw.txt
+          cat plan.txt
+          {
+            echo "## plan: ${{ inputs.stack }} / ${{ inputs.action }}"
+            echo '```'
+            grep -E '^(Plan:|No changes|Changes to Outputs)' plan.txt || true
+            echo '```'
+            echo "<details><summary>全文</summary>"
+            echo
+            echo '```'
+            cat plan.txt
+            echo '```'
+            echo "</details>"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  apply:
+    name: ${{ inputs.action }} (${{ inputs.stack }})
+    needs: plan
+    if: inputs.action != 'plan'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    # この Environment に「Required reviewers」を設定しておくと、ここで承認待ちになる。
+    # OIDC トークンの sub が "repo:<owner>/<repo>:environment:honeypot-apply" になり、
+    # apply ロールはこの sub のトークンしか受け付けない
+    environment: honeypot-apply
+    defaults:
+      run:
+        working-directory: terraform/${{ inputs.stack }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_APPLY_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+          mask-aws-account-id: true
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+          terraform_wrapper: false
+
+      - name: terraform init
+        run: |
+          terraform init \
+            -backend-config="bucket=${{ secrets.TF_STATE_BUCKET }}" \
+            -backend-config="key=${{ inputs.stack }}/terraform.tfstate" \
+            -backend-config="region=${AWS_REGION}" \
+            -backend-config="use_lockfile=true"
+
+      # plan ファイルは受け渡さない（public リポジトリでは Artifact を誰でも取得できるため）。
+      # 承認までの間に差分が変わっていないかは、このステップのログで確認できる
+      - name: terraform ${{ inputs.action }}
+        run: |
+          if [ "${{ inputs.action }}" = "destroy" ]; then
+            terraform destroy -auto-approve -no-color
+          else
+            terraform apply -auto-approve -no-color
+          fi
+
+      - name: outputs
+        if: inputs.action == 'apply'
+        run: |
+          ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+          {
+            echo "## outputs: ${{ inputs.stack }}"
+            echo '```'
+            terraform output -no-color | sed "s/${ACCOUNT_ID}/************/g"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"

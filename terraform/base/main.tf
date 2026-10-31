@@ -10,7 +10,13 @@
 # =============================================================================
 
 terraform {
-  required_version = ">= 1.6.0"
+  # use_lockfile（S3 だけで state ロック）を使うため 1.10 以上
+  required_version = ">= 1.10.0"
+
+  # state は bootstrap スタックで作る S3 バケットに置く（Actions と手元PCで共有するため）。
+  # bucket / key / region は init 時に -backend-config で渡す（docs/07 参照）
+  backend "s3" {}
+
   required_providers {
     aws = {
       source  = "hashicorp/aws"

@@ -23,10 +23,8 @@
 - [ ] Logs Insights の主要クエリ結果を CSV エクスポート（結果画面の Export results）
 
 ### 1-2. 削除
-```bash
-cd terraform/honeypot
-terraform destroy
-```
+Actions → **Terraform** → Run workflow（`stack: honeypot` / `action: destroy`）→ plan のサマリーで削除対象を確認 → 承認
+（スマホからでも可。手元PCからなら `./scripts/tf-init.sh honeypot && terraform -chdir=terraform/honeypot destroy`）
 - [ ] destroy 完了（EC2 / EBS / ALB / Listener / Target Group / WAF Web ACL / WAF Logging設定 / SG / IGW / Route Table / Subnet / VPC）
 
 ### 1-3. 確認
@@ -49,19 +47,26 @@ terraform destroy
 - [ ] GuardDuty Findings を再エクスポート（段階1以降に増えた分）
 
 ### 2-2. 削除
-```bash
-cd terraform/base
-terraform destroy
-```
+Actions → **Terraform** → Run workflow（`stack: base` / `action: destroy`）→ 承認
 - [ ] S3 バケット削除（`force_destroy = true` なので中身ごと）
 - [ ] ロググループ3つ削除
 - [ ] GuardDuty detector 削除（= 無効化。Findings も消える）
-- [ ] 予算削除（※Cost Explorer での最終確認後に消したい場合は、先に `terraform state rm aws_budgets_budget.honeypot` してから destroy し、後でコンソールから手動削除）
+- [ ] 予算削除（※Cost Explorer での最終確認後に消したい場合は、先に手元PCで `./scripts/tf-init.sh base && terraform -chdir=terraform/base state rm aws_budgets_budget.honeypot` してから destroy し、後でコンソールから手動削除）
 
-### 2-3. 確認
+### 2-3. bootstrap の削除（手元PC。base の destroy が終わってから）
+state 用バケットを消すと base / honeypot の state も消えるため、必ず最後に行う。
+```bash
+cd terraform/bootstrap
+terraform destroy    # state 用 S3、OIDC プロバイダ（このスタックで作った場合）、Actions 用ロール3つ
+```
+- [ ] GitHub → Settings → Secrets（`TF_STATE_BUCKET` / `AWS_*_ROLE_ARN` / `ALERT_EMAIL`）と Environment `honeypot-apply` を削除
+- [ ] 手元の `terraform/bootstrap/terraform.tfstate` を削除してよい
+
+### 2-4. 確認
 - [ ] `./scripts/verify.sh teardown` で参考欄の Project=honeypot タグ付きリソースが空（タグ API の反映は遅れることがある）
 - [ ] CloudWatch → ロググループに `/honeypot/*` と `aws-waf-logs-honeypot` が無い
-- [ ] IAM ロール `honeypot-ec2` が無い（honeypot スタックで削除済みのはず）
+- [ ] IAM ロール `honeypot-ec2` / `honeypot-gha-plan` / `honeypot-gha-apply` / `honeypot-gha-emergency` が無い
+- [ ] S3 バケット `honeypot-tfstate-<account>` が無い
 - [ ] MCP 用に作った許可セット／ロール `honeypot-analyst` を削除
 
 ## 段階3: 2〜3日後の請求確認
