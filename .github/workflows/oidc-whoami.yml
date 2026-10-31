@@ -1,0 +1,41 @@
+# OIDC の学習・動作確認用。AWS には何も作らない。
+#   1. GitHub が発行する OIDC トークンの中身（クレーム）を表示する ※トークン本体は表示しない
+#   2. そのトークンで plan ロールを引き受け、aws sts get-caller-identity で「誰として入れたか」を表示する
+# 実行: Actions → "OIDC whoami" → Run workflow（main ブランチ）
+name: OIDC whoami
+
+on:
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  whoami:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: OIDC トークンのクレームを表示
+        run: |
+          # ACTIONS_ID_TOKEN_REQUEST_URL / TOKEN は permissions: id-token: write の時だけ渡される
+          TOKEN=$(curl -sSf -H "Authorization: bearer ${ACTIONS_ID_TOKEN_REQUEST_TOKEN}" \
+            "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=sts.amazonaws.com" | jq -r .value)
+          echo "::add-mask::${TOKEN}"
+          # JWT = ヘッダ.ペイロード.署名。ペイロード（base64url）だけ復号して主要なクレームを表示
+          PAYLOAD=$(echo "$TOKEN" | cut -d. -f2 | tr '_-' '/+')
+          while [ $(( ${#PAYLOAD} % 4 )) -ne 0 ]; do PAYLOAD="${PAYLOAD}="; done
+          echo "$PAYLOAD" | base64 -d | jq '{iss, aud, sub, repository, ref, environment, event_name, workflow_ref, actor, exp, iat}' \
+            | tee -a "$GITHUB_STEP_SUMMARY"
+
+      - uses: aws-actions/configure-aws-credentials@v4.3.1
+        with:
+          role-to-assume: ${{ secrets.AWS_PLAN_ROLE_ARN }}
+          aws-region: ap-northeast-1
+          mask-aws-account-id: true
+
+      - name: AWS 側から見た自分
+        run: |
+          # Arn は assumed-role/honeypot-gha-plan/GitHubActions のようになる（アカウントIDはマスク）
+          aws sts get-caller-identity
+          echo "一時認証情報の有効期限（秒）: 3600 以内。アクセスキーはどこにも保存されていない"

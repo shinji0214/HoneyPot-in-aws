@@ -29,18 +29,8 @@ variable "budget_usd" {
 }
 
 variable "alert_email" {
-  description = "予算アラートの通知先メールアドレス"
+  description = "予算アラート・GuardDuty 通知の送信先。public リポジトリの Actions ログに出ないよう sensitive にしている"
   type        = string
+  sensitive   = true
 }
 
-variable "github_repo" {
-  description = "スマホからの緊急隔離に使う GitHub リポジトリ（owner/name）。空なら GitHub Actions 用ロールを作らない"
-  type        = string
-  default     = ""
-}
-
-variable "create_github_oidc_provider" {
-  description = "GitHub Actions の OIDC プロバイダを作るか（アカウントに既にあれば false）"
-  type        = bool
-  default     = true
-}

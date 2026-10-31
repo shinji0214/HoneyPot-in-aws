@@ -52,7 +52,8 @@ SG を「ルールなし」の隔離用 SG に差し替え → ALB から外す 
 
 ### 手順3: 撤収
 ```bash
-cd terraform/honeypot && terraform destroy
+# Actions「Terraform」で honeypot / destroy（スマホから承認まで可能）。手元PCなら:
+./scripts/tf-init.sh honeypot && terraform -chdir=terraform/honeypot destroy
 ./scripts/verify.sh teardown
 ```
 - 手順1で作ったスナップショットは Terraform 管理外。調査が終わったら手動で削除（verify.sh の「スナップショット残骸なし」で確認できる）

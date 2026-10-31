@@ -1,3 +1,4 @@
+# ローカルで実行する場合のみ使う。GitHub Actions では Secrets / Variables から渡す（docs/07）
 # cp terraform.tfvars.example terraform.tfvars して編集（terraform.tfvars は .gitignore 済み）
 alert_email = "you@example.com"
 
@@ -7,7 +8,3 @@ enable_guardduty = true
 # 1,000円 / 為替（約150〜155円/USD）
 budget_usd = 6.5
 
-# スマホからの緊急隔離（GitHub Actions）。リポジトリを作ったら owner/name を入れる
-github_repo = "shinji0214/HoneyPot-in-aws"
-# アカウントに GitHub の OIDC プロバイダが既にあれば false
-create_github_oidc_provider = true
