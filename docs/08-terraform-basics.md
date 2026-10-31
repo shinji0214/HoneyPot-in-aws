@@ -178,3 +178,17 @@ output "tf_state_bucket" {
   apply で作られて AWS が値を返した瞬間に確定し、それを参照している後続のリソースに自動で流し込まれる
 - この参照があるので Terraform は「バケット → それを参照するポリシー」の順に作ると自動で判断する（実行順を書かなくていい理由）
 - 確定した値は state に保存されるので、次回以降の plan / output でも使える
+
+## 10. data は「作らないけど値は欲しいもの」を問い合わせる
+
+`data` は、このコードでは作らないものを探して読み取る仕組み。読むだけなので apply / destroy しても AWS 側には何も起きない。
+
+| 何を聞くか | このリポジトリの例 | 取れる値 |
+|---|---|---|
+| 自分（今の認証情報）の情報 | `data "aws_caller_identity" "current" {}` | `account_id`。PC の `aws sts get-caller-identity` と同じ。条件不要なので `{}` が空 |
+| AWS 側の情報 | `data "aws_elb_service_account" "main" {}` | ALB がログを書き込む AWS 側のアカウント（S3 バケットポリシーで許可する相手） |
+| AWS が用意しているもの | `data "aws_ssm_parameter" "al2023_arm64"` | 最新の Amazon Linux 2023 の AMI ID |
+| 別スタックで作ったもの | honeypot の `data "aws_s3_bucket" "alb_logs"` など | base で作ったバケット・ロググループ |
+
+- `aws_caller_identity` のおかげで、コードにアカウントIDを直接書かずに済む（public リポジトリでも安心、別アカウントでもそのまま動く）
+- 例外: `data "aws_iam_policy_document"` は AWS に問い合わせない。HCL で書いたポリシーを JSON に変換するだけの道具
