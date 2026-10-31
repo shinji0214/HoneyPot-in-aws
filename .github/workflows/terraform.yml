@@ -1,6 +1,6 @@
 # base / honeypot スタックの plan・構築・削除を GitHub Actions から行う。
 #
-# 実行: Actions → "Terraform" → Run workflow
+# 実行: Actions → "構築・削除（Terraform）" → Run workflow
 #   stack : base（ログ・GuardDuty・予算） / honeypot（VPC・EC2・ALB・WAF）
 #   action: plan（確認だけ） / apply（構築・変更） / destroy（削除）
 #
@@ -11,7 +11,7 @@
 # 認証は OIDC（アクセスキーなし）。仕組みと初期設定は docs/07-github-actions-oidc.md
 #
 # 構築順: base → honeypot。削除順: honeypot → base（base は分析が終わってから）
-name: Terraform
+name: 構築・削除（Terraform）
 
 on:
   workflow_dispatch:

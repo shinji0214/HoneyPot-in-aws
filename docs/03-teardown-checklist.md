@@ -23,7 +23,7 @@
 - [ ] Logs Insights の主要クエリ結果を CSV エクスポート（結果画面の Export results）
 
 ### 1-2. 削除
-Actions → **Terraform** → Run workflow（`stack: honeypot` / `action: destroy`）→ plan のサマリーで削除対象を確認 → 承認
+Actions → **構築・削除（Terraform）** → Run workflow（`stack: honeypot` / `action: destroy`）→ plan のサマリーで削除対象を確認 → 承認
 （スマホからでも可。手元PCからなら `./scripts/tf-init.sh honeypot && terraform -chdir=terraform/honeypot destroy`）
 - [ ] destroy 完了（EC2 / EBS / ALB / Listener / Target Group / WAF Web ACL / WAF Logging設定 / SG / IGW / Route Table / Subnet / VPC）
 
@@ -47,7 +47,7 @@ Actions → **Terraform** → Run workflow（`stack: honeypot` / `action: destro
 - [ ] GuardDuty Findings を再エクスポート（段階1以降に増えた分）
 
 ### 2-2. 削除
-Actions → **Terraform** → Run workflow（`stack: base` / `action: destroy`）→ 承認
+Actions → **構築・削除（Terraform）** → Run workflow（`stack: base` / `action: destroy`）→ 承認
 - [ ] S3 バケット削除（`force_destroy = true` なので中身ごと）
 - [ ] ロググループ3つ削除
 - [ ] GuardDuty detector 削除（= 無効化。Findings も消える）

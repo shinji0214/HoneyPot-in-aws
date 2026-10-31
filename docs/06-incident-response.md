@@ -31,7 +31,7 @@
 ## 3. 気づいたら何をするか
 
 ### 手順1: 隔離（迷ったらまずこれ。5分以内）
-**スマホから（外出中）**: GitHub → リポジトリ → Actions → 「Emergency isolate honeypot」→ Run workflow →
+**スマホから（外出中）**: GitHub → リポジトリ → Actions → 「緊急隔離（Emergency isolate）」→ Run workflow →
 confirm に `ISOLATE` と入力して実行。結果は同じ画面で確認できる。
 （GitHub アプリで Run workflow が出ない場合は、スマホのブラウザで github.com を開く）
 

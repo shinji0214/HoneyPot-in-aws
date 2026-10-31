@@ -76,11 +76,11 @@ GitHub リポジトリ → Settings で以下を設定する。
   > AWS の apply ロール（変更権限あり）はこの sub のトークンしか受け付けない（terraform/bootstrap の信頼ポリシー）。
   > つまり「GitHub 側の承認」と「AWS 側の権限」が sub でつながっていて、承認を通らないジョブはワークフローを書き換えても書き込み権限を得られない。
   > plan ロール（読み取り専用）は承認なしで使える。詳しくは docs/07
-- [ ] **Actions → OIDC whoami → Run workflow** が成功し、`sub` と `assumed-role/honeypot-gha-plan/...` が表示される（docs/07 の学習ポイント）
+- [ ] **Actions → 接続確認（OIDC whoami） → Run workflow** が成功し、`sub` と `assumed-role/honeypot-gha-plan/...` が表示される（docs/07 の学習ポイント）
 
 ## 3. 構築（GitHub Actions）
 
-Actions → **Terraform** → Run workflow で、次の順に実行する。
+Actions → **構築・削除（Terraform）** → Run workflow で、次の順に実行する。
 
 1. [ ] `stack: base` / `action: plan` → サマリーで作られるものを確認
 2. [ ] `stack: base` / `action: apply` → 承認待ちになるので **Review deployments → Approve** → 完了
@@ -120,7 +120,7 @@ curl -i "http://$ALB/?q=<script>alert(1)</script>"   # 403（WAF CommonRuleSet �
 - [ ] S3 `honeypot-alb-logs-<account>/alb/` にログが出始める（5分ごと）
 - [ ] 隔離確認: `./scripts/verify.sh isolation` がすべて OK
 - [ ] スマホ緊急隔離の予行演習（観測開始前に1回、**スマホから**）
-  - Actions → Emergency isolate honeypot → Run workflow（confirm: `ISOLATE`、snapshot: オフ）→ 成功し EC2 が「停止済み」になる
+  - Actions → 緊急隔離（Emergency isolate） → Run workflow（confirm: `ISOLATE`、snapshot: オフ）→ 成功し EC2 が「停止済み」になる
   - 元に戻す: `aws ec2 start-instances --instance-ids $IID`（PC、またはコンソールで「開始」）→ 起動後に Actions「Terraform」で `honeypot / apply`（SG とターゲット登録が元に戻る）→ `curl http://$ALB/` が 200
 - [ ] 緊急時の手順 `docs/06-incident-response.md` に目を通し、`scripts/emergency-isolate.sh` の場所を確認しておく
 - [ ] 外部から 22 番が開いていない: `nc -vz -w 3 $(terraform -chdir=terraform/honeypot output -raw instance_public_ip) 22` がタイムアウト
