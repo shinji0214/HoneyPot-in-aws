@@ -109,14 +109,35 @@ sub が `environment:honeypot-apply` になるのは、その Environment の保
 
 それでも気になる場合は、リポジトリを private にしても全て同じように動く（Actions の無料枠は private だと月2,000分）。
 
-## 6. 初期設定（手順書 docs/01 の手順2と同じ）
+## 6. アクションのロックファイル（actions.lock）
+
+ワークフローが使う外部のアクション（`actions/checkout` など）は、タグ（`v4.4.0` など）で指定している。
+タグは後から別のコミットに付け替えられるので、アクションの作者のアカウントが乗っ取られると、
+**同じタグのまま中身が悪意あるコードに差し替わる**ことがある（2025年の tj-actions/changed-files 事件がこの手口）。
+今回のワークフローは AWS の権限（OIDC トークン）を扱うので、ここを固定しておく価値が高い。
+
+`.github/workflows/actions.lock` は、各タグが**どのコミットを指していたか**を記録したファイル。
+GitHub はこのファイルに書かれたコミットのコードだけを実行する。タグが付け替えられても、ロックしたコミットのまま動く。
+
+| やること | コマンド（手元PC。GitHub CLI と拡張 `github/gh-actions-lock` が必要） |
+|---|---|
+| アクションを追加・削除した | `gh actions-lock` |
+| アクションのバージョンを上げた / タグの付け替えを取り込む | `gh actions-lock --relock`（差分のコミットIDを確認してからコミット） |
+| ロックしたコミットが消えた | `gh actions-lock --relock --accept-moved` |
+
+- `gh actions-lock` はワークフロー内の `@v4` のような曖昧な指定を `@v4.4.0` のような正確なバージョンに書き換える
+- 生成されたファイルは手で編集しない
+- リポジトリ設定の **Require lockfile** を有効にすると、ロックファイルに無いアクションは実行されなくなる
+- 2026年10月に一般提供された新しい機能。オプションは `gh actions-lock --help` で確認する
+
+## 7. 初期設定（手順書 docs/01 の手順2と同じ）
 
 1. 手元PCで `terraform/bootstrap` を apply
 2. GitHub Secrets に `TF_STATE_BUCKET` / `AWS_PLAN_ROLE_ARN` / `AWS_APPLY_ROLE_ARN` / `AWS_EMERGENCY_ROLE_ARN` / `ALERT_EMAIL`
 3. Environment `honeypot-apply` を作り、Required reviewers に自分、Deployment branches を `main` のみに
 4. **OIDC whoami** を実行して動作確認
 
-## 7. うまくいかない時
+## 8. うまくいかない時
 
 | エラー | 原因と確認 |
 |---|---|
@@ -124,9 +145,10 @@ sub が `environment:honeypot-apply` になるのは、その Environment の保
 | `Could not load credentials from any providers` | ワークフローに `permissions: id-token: write` が無い / Secrets 名の打ち間違い |
 | `No OpenIDConnect provider found` | OIDC プロバイダが無い。bootstrap を `create_github_oidc_provider = true` で apply |
 | `AccessDenied ... iam:CreateRole` など | apply ロールの権限不足。エラーに出たアクションを `terraform/bootstrap/main.tf` の apply ポリシーに追加して、手元PCで bootstrap を再 apply |
+| ワークフローが「lockfile」関連のエラーで始まらない | ワークフローの `uses:` を変えたのに actions.lock を更新していない。手元で `gh actions-lock` を実行してコミット |
 | `Error acquiring the state lock` | 別の実行が動いている、または中断で `.tflock` が残った。他に動いていないことを確認してから、手元PCで `terraform -chdir=terraform/<stack> force-unlock <ID>` |
 
-## 8. 発展（今回はやらないが学習ネタとして）
+## 9. 発展（今回はやらないが学習ネタとして）
 
 - **CloudTrail で見る**: CloudTrail → イベント履歴で `AssumeRoleWithWebIdentity` を検索すると、どのトークン（sub）でいつ入ったかが記録されている。記事ネタになる
 - **plan ロールを絞る**: `ReadOnlyAccess` は S3 の中身なども読める。このアカウントに他のデータがあるなら、Terraform が実際に呼ぶ Describe/Get/List だけに絞る（IAM Access Analyzer のポリシー生成で、CloudTrail から必要な権限を洗い出せる）
