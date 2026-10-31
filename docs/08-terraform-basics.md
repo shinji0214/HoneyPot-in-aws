@@ -192,3 +192,57 @@ output "tf_state_bucket" {
 
 - `aws_caller_identity` のおかげで、コードにアカウントIDを直接書かずに済む（public リポジトリでも安心、別アカウントでもそのまま動く）
 - 例外: `data "aws_iam_policy_document"` は AWS に問い合わせない。HCL で書いたポリシーを JSON に変換するだけの道具
+
+## 11. 変数を使った条件分岐（論理式）
+
+純粋な変数に当たるのは `variable` と `locals`。ただし**一度決まったら変わらない値**で、プログラムのように途中で代入し直すことはできない。
+Terraform には `if` 文がないので、**条件演算子 `条件 ? 真の値 : 偽の値`** を使う。
+
+**ON/OFF スイッチ: `count` を 0 か 1 にする（定番）**
+
+```hcl
+# terraform/honeypot/network.tf
+resource "aws_vpc_security_group_ingress_rule" "ec2_http_direct" {
+  count = var.expose_ec2_directly ? 1 : 0   # true なら1個作る、false なら作らない
+  ...
+}
+
+# terraform/base/main.tf（GuardDuty も同じ）
+resource "aws_guardduty_detector" "main" {
+  count = var.enable_guardduty ? 1 : 0
+  ...
+}
+```
+
+`count` を付けたリソースは配列になるので、参照は `[0]` を付ける。作らない場合もあるので参照側にも条件が要る:
+
+```hcl
+# terraform/base/outputs.tf
+value = var.enable_guardduty ? aws_guardduty_detector.main[0].id : null
+```
+
+**文字列の比較**
+
+```hcl
+# terraform/honeypot/alb.tf
+count = var.acm_certificate_arn == "" ? 0 : 1   # 証明書が指定されていれば HTTPS リスナーを作る
+```
+
+**locals で組み立て＋分岐**（OIDC の sub）
+
+```hcl
+# terraform/bootstrap/main.tf
+sub_repo = (var.github_owner_id != "" && var.github_repo_id != ""
+  ? "repo:${local.github_owner}@${var.github_owner_id}/${local.github_name}@${var.github_repo_id}"
+: "repo:${var.github_repo}")
+```
+
+**数だけ作る**
+
+```hcl
+# terraform/honeypot/network.tf
+count = length(var.azs)   # 指定した AZ の数だけサブネットを作る
+```
+
+使える演算子: `==` `!=` `>` `<` `>=` `<=`、`&&`（かつ）`||`（または）`!`（否定）、`+ - * /`。
+文字列の中に値を埋め込むのは `"${var.project}-alb-logs"`。
