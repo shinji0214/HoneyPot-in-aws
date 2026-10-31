@@ -62,6 +62,20 @@ GitHub リポジトリ → Settings で以下を設定する。
 - [ ] **Environments → New environment → `honeypot-apply`**
   - Required reviewers: 自分を追加（apply / destroy の前に承認ボタンが出る。スマホの GitHub アプリからも承認できる）
   - Deployment branches and tags: **Selected branches → `main`** のみ
+
+  > 📝 **学習メモ: Environment は何のため？**
+  > 目的は「**AWS に変更を加える（apply / destroy）ジョブは、自分が承認ボタンを押すまで動かないようにする**」こと。
+  >
+  > - **Environment**: GitHub Actions の「デプロイ先」の名前と、そこに入るためのルールのセット。
+  >   terraform.yml の apply ジョブに `environment: honeypot-apply` と書いてあるので、このジョブは必ずこのルールを通る
+  > - **Required reviewers**: ジョブが「承認待ち」で止まり、承認者が Approve するまで AWS に触らない。
+  >   plan の結果を見てから作成・削除を判断できるので、誤操作や意図しない変更を防げる（スマホの GitHub アプリからも承認可）
+  > - **main ブランチ限定**: 作業中のブランチや外部からの PR のコードでは apply ジョブが動けない。main に入ったコードだけが AWS を変更できる
+  >
+  > **AWS 側とのつながり**: このルールを通ったジョブだけ、OIDC トークンの sub が `…:environment:honeypot-apply` になる。
+  > AWS の apply ロール（変更権限あり）はこの sub のトークンしか受け付けない（terraform/bootstrap の信頼ポリシー）。
+  > つまり「GitHub 側の承認」と「AWS 側の権限」が sub でつながっていて、承認を通らないジョブはワークフローを書き換えても書き込み権限を得られない。
+  > plan ロール（読み取り専用）は承認なしで使える。詳しくは docs/07
 - [ ] **Actions → OIDC whoami → Run workflow** が成功し、`sub` と `assumed-role/honeypot-gha-plan/...` が表示される（docs/07 の学習ポイント）
 
 ## 3. 構築（GitHub Actions）
