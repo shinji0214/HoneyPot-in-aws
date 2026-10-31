@@ -43,8 +43,19 @@ locals {
   oidc_host    = "token.actions.githubusercontent.com"
 
   # OIDC トークンの sub クレーム（どのリポジトリ・どのブランチ/環境のジョブか）
-  sub_main_branch = "repo:${var.github_repo}:ref:refs/heads/main"
-  sub_apply_env   = "repo:${var.github_repo}:environment:${var.apply_environment}"
+  #   従来形式: repo:OWNER/REPO:ref:refs/heads/main
+  #   ID 付き形式: repo:OWNER@OWNER_ID/REPO@REPO_ID:ref:refs/heads/main
+  #     GitHub がオーナー・リポジトリの不変 ID を sub に含めて発行する形式。リポジトリを消して同名で
+  #     作り直されても ID が変わるので、乗っ取られた同名リポジトリからはロールを引き受けられない。
+  #   実際にどちらで発行されているかは OIDC whoami ワークフローの sub 表示で確認できる
+  github_owner = split("/", var.github_repo)[0]
+  github_name  = split("/", var.github_repo)[1]
+  sub_repo = (var.github_owner_id != "" && var.github_repo_id != ""
+    ? "repo:${local.github_owner}@${var.github_owner_id}/${local.github_name}@${var.github_repo_id}"
+  : "repo:${var.github_repo}")
+
+  sub_main_branch = "${local.sub_repo}:ref:refs/heads/main"
+  sub_apply_env   = "${local.sub_repo}:environment:${var.apply_environment}"
 }
 
 # -----------------------------------------------------------------------------
