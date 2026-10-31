@@ -27,6 +27,7 @@ VPC 10.100.0.0/16（Peering / TGW / VPN なし、出口は IGW のみ）
 | 5 | [docs/05-aws-policy-check.md](docs/05-aws-policy-check.md) | AWS 規約チェックと観測中の禁止事項・Abuse 対応 |
 | 6 | [docs/06-incident-response.md](docs/06-incident-response.md) | 乗っ取り対策（防ぐ・気づく・止める）と緊急隔離の手順 |
 | 7 | [docs/07-github-actions-oidc.md](docs/07-github-actions-oidc.md) | GitHub Actions + Terraform + OIDC の仕組みと初期設定 |
+| 8 | [docs/08-terraform-basics.md](docs/08-terraform-basics.md) | Terraform の基本（スタック構成、ファイル分け、名前のルール、variable / locals / output）の学習メモ |
 | — | [queries/logs-insights.md](queries/logs-insights.md) | Logs Insights クエリ集（nginx / WAF） |
 
 ## ディレクトリ
