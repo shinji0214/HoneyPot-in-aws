@@ -276,3 +276,11 @@ count = length(var.azs)   # 指定した AZ の数だけサブネットを作る
 - 次の実行で別の値を渡せば、その値で確定する。Terraform は今の AWS（state）と新しい設計図を比べて差分だけ更新する
 - たとえると variable は「注文票の記入欄」。注文時（実行時）には好きな値を書けるが、調理中（実行中）には書き換えられない
 - このリポジトリでは GitHub の Variables（`BUDGET_USD` など）を書き換えてからワークフローを実行し直すと、次の plan / apply でその値が使われる
+
+**locals は「コンストラクタで初期化される readonly 定数」**
+
+- 実行の最初に variable が確定 → それを材料に locals が一度だけ計算されて確定 → 以降は読むだけ
+- locals 自体は外から書き換えられないが、材料の variable が変われば計算結果も変わる
+  （例: `alb_log_bucket = "${var.project}-alb-logs-${local.account_id}"` は `project=test` なら `test-alb-logs-…`）
+- 材料を使わず `"30"` のように直接書いた locals は完全な定数
+- 「外から一部だけ変えたい値」は、変えたい部分を variable に切り出して locals の式に埋め込むのが定番
