@@ -43,15 +43,15 @@ PC にずっと有効な鍵が残らないため（OIDC と同じ考え方）。
      2. 設定 → 保管中の暗号化を管理 → **AWS 所有キー** に切り替え
      3. KMS → カスタマー管理型のキー → `mrk-...` を **レプリカ側のリージョンから** 削除スケジュール（7日）→ 東京でも同じキーを削除スケジュール
 3. [ ] **ユーザーを追加**: ユーザー → ユーザーを追加
-   - ユーザー名: 例 `yamada-admin`、メールアドレス: 自分のアドレス
+   - ユーザー名: `<あなたの名前>-admin`（例 `taro-admin`。以降 `<USER>-admin` と表記）、メールアドレス: 自分のアドレス
    - 「パスワードの設定手順が記載された E メールを送信」を選ぶ → 届いたメールから招待を承諾してパスワード設定
 4. [ ] **許可セットを作る**: 許可セット → 許可セットを作成 → 事前定義された許可セット → **AdministratorAccess**
    - セッション期間: 4 時間程度（長すぎると漏れた時のリスクが大きい）
 5. [ ] **アカウントに割り当てる**: AWS アカウント → 自分のアカウントにチェック → ユーザーまたはグループを割り当て →
-   `yamada-admin` → 許可セット `AdministratorAccess`
+   `<USER>-admin` → 許可セット `AdministratorAccess`
 6. [ ] **MFA を必須にする**: 設定 → 認証 → 多要素認証 → 設定 → 「サインインのたびに」＋「MFA デバイスを登録するよう求める」
 7. [ ] **AWS アクセスポータルの URL を控える**: ダッシュボード右側の「設定の概要」、または 設定 → アイデンティティソース タブにある「AWS アクセスポータルの URL」（`https://d-xxxxxxxxxx.awsapps.com/start` の形。招待メールにも記載）
-8. [ ] ブラウザのシークレットウィンドウでポータル URL を開き、`yamada-admin` でログイン（MFA 登録）→ アカウント → AdministratorAccess → コンソールが開けば OK
+8. [ ] ブラウザのシークレットウィンドウでポータル URL を開き、`<USER>-admin` でログイン（MFA 登録）→ アカウント → AdministratorAccess → コンソールが開けば OK
 
 以降、**コンソール作業もこのポータルから入る**。ルートユーザーは請求の最終確認以外では使わない。
 
@@ -88,7 +88,7 @@ aws configure sso
 | SSO start URL | B-7 で控えたポータル URL |
 | SSO region | `ap-northeast-1` |
 | SSO registration scopes | そのまま Enter |
-| （ブラウザが開く） | `yamada-admin` でログインして「許可」 |
+| （ブラウザが開く） | `<USER>-admin` でログインして「許可」 |
 | アカウント／ロール | 自分のアカウント / `AdministratorAccess` |
 | Default client Region | `ap-northeast-1` |
 | CLI default output format | `json` |
@@ -99,7 +99,7 @@ aws configure sso
 $env:AWS_PROFILE = "honeypot-admin"
 aws sts get-caller-identity
 ```
-`Arn` に `assumed-role/AWSReservedSSO_AdministratorAccess_.../yamada-admin` と出れば OK。
+`Arn` に `assumed-role/AWSReservedSSO_AdministratorAccess_.../<USER>-admin` と出れば OK。
 
 **次回以降**: 認証が切れたら `aws sso login --profile honeypot-admin`。PowerShell を開くたびに `$env:AWS_PROFILE = "honeypot-admin"` を設定する。
 

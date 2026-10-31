@@ -19,8 +19,8 @@ AWS アカウントの初期設定（ルートの MFA、請求情報へのアク
 ## 1. リポジトリ準備
 
 ```bash
-git clone https://github.com/shinji0214/HoneyPot-in-aws.git
-cd HoneyPot-in-aws
+git clone https://github.com/<OWNER>/<REPO>.git   # <OWNER>/<REPO> は自分のリポジトリに読み替え
+cd <REPO>
 ```
 
 **このリポジトリは public。** Actions のログも誰でも見られる。メールアドレスは Secret と `sensitive` 変数で、

@@ -3,6 +3,8 @@
 環境の作成・削除を GitHub Actions から行う仕組みと、そこで使う OIDC（アクセスキーを使わない AWS 認証）のまとめ。
 **学習用ドキュメント**なので、「なぜそうしているか」を中心に書いている。
 
+表記: `<OWNER>/<REPO>` は GitHub のリポジトリ（オーナー名/リポジトリ名）に読み替える。
+
 ---
 
 ## 1. 全体像
@@ -36,7 +38,7 @@ IAM ユーザーのアクセスキー（`AKIA...` と秘密鍵）を GitHub Secr
 - 「どのリポジトリ・どのブランチから使われたか」を AWS 側で制限できない
 
 ### OIDC 方式（今回）
-GitHub が**ジョブごとに**「このジョブは shinji0214/HoneyPot-in-aws の main ブランチで動いています」と書いた
+GitHub が**ジョブごとに**「このジョブは <OWNER>/<REPO> の main ブランチで動いています」と書いた
 **署名付きの身分証明書（JWT = ID トークン）**を発行する。AWS はその署名と中身を確認して、**1時間だけ有効な一時認証情報**を渡す。
 
 - 保存しておく秘密がない（GitHub Secrets にあるのはロールの ARN だけで、漏れても単体では使えない）
@@ -49,7 +51,7 @@ GitHub が**ジョブごとに**「このジョブは shinji0214/HoneyPot-in-aws
  ① ジョブ開始（permissions: id-token: write があると、トークンを要求する権利が付く）
  ② configure-aws-credentials が GitHub に ID トークンを要求
       GitHub ──▶ JWT（iss=https://token.actions.githubusercontent.com, aud=sts.amazonaws.com,
-                      sub=repo:shinji0214/HoneyPot-in-aws:ref:refs/heads/main, 有効期限 数分）
+                      sub=repo:<OWNER>/<REPO>:ref:refs/heads/main, 有効期限 数分）
  ③ その JWT を付けて AWS STS の AssumeRoleWithWebIdentity を呼ぶ（ロール ARN を指定）
  ④ STS が確認すること
       a. 署名: OIDC プロバイダ（token.actions.githubusercontent.com）の公開鍵で検証 → 本物の GitHub 発行か
@@ -64,9 +66,9 @@ GitHub が**ジョブごとに**「このジョブは shinji0214/HoneyPot-in-aws
 |---|---|---|
 | `iss` | `https://token.actions.githubusercontent.com` | 発行者。AWS の OIDC プロバイダの URL と一致する必要がある |
 | `aud` | `sts.amazonaws.com` | 宛先。信頼ポリシーで固定 |
-| `sub` | `repo:shinji0214/HoneyPot-in-aws:ref:refs/heads/main` | **誰か**。信頼ポリシーの一番大事な条件 |
-| `sub`（Environment 使用時） | `repo:shinji0214/HoneyPot-in-aws:environment:honeypot-apply` | ジョブに `environment:` を書くと sub がこの形に変わる |
-| `ref` / `event_name` / `actor` | `refs/heads/main` / `workflow_dispatch` / `shinji0214` | 参考情報 |
+| `sub` | `repo:<OWNER>/<REPO>:ref:refs/heads/main` | **誰か**。信頼ポリシーの一番大事な条件 |
+| `sub`（Environment 使用時） | `repo:<OWNER>/<REPO>:environment:honeypot-apply` | ジョブに `environment:` を書くと sub がこの形に変わる |
+| `ref` / `event_name` / `actor` | `refs/heads/main` / `workflow_dispatch` / `<OWNER>` | 参考情報 |
 
 ## 3. ロールの分け方（最小権限）
 
