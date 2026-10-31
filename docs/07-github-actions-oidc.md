@@ -60,6 +60,20 @@ GitHub が**ジョブごとに**「このジョブは <OWNER>/<REPO> の main �
  ⑥ 以降の terraform / aws コマンドはその一時認証情報で動く
 ```
 
+> 📝 **学習メモ: 認証は GitHub がしているのか？**
+> 役割が2つに分かれている。
+>
+> - **GitHub（身分証明書の発行）**: GitHub の OIDC トークン発行サービス（`token.actions.githubusercontent.com`）が、
+>   ジョブごとに「このジョブは〇〇リポジトリの main で動いている」と書いて署名したトークンを発行する（数分で失効）
+> - **AWS（審査と鍵の発行）**: AWS STS がトークンを受け取り、①本当に GitHub の署名か（bootstrap で登録した OIDC プロバイダで検証）、
+>   ②aud と sub がロールの信頼ポリシーの条件に合うか を確認し、OK なら1時間で切れる一時的な AWS の鍵を渡す
+>
+> たとえると GitHub は「社員証を発行する会社」、AWS は「社員証を見て入館証を出す受付」。
+> **入れるかどうかの判断は AWS 側**で行う。GitHub は「誰のジョブか」を保証するだけで AWS の権限は持たないので、
+> GitHub に AWS の鍵を預けずに済む。
+> 初回の whoami が `Not authorized to perform sts:AssumeRoleWithWebIdentity` で失敗したのも、この受付の条件（sub の形式）が合わなかったため（下の「sub の ID 付き形式」参照）。
+> bootstrap の OIDC プロバイダ（GitHub を信頼する設定）とロールの権限は正しく、直したのは信頼ポリシーの sub の文字列だけ。
+
 ### トークンの主なクレーム（OIDC whoami ワークフローで実物を見られる）
 
 | クレーム | 例 | 意味 |
@@ -68,6 +82,15 @@ GitHub が**ジョブごとに**「このジョブは <OWNER>/<REPO> の main �
 | `aud` | `sts.amazonaws.com` | 宛先。信頼ポリシーで固定 |
 | `sub` | `repo:<OWNER>/<REPO>:ref:refs/heads/main` | **誰か**。信頼ポリシーの一番大事な条件 |
 | `sub`（Environment 使用時） | `repo:<OWNER>/<REPO>:environment:honeypot-apply` | ジョブに `environment:` を書くと sub がこの形に変わる |
+
+> 📝 **sub の ID 付き形式**: 実際に動かすと sub が `repo:<OWNER>@<OWNER_ID>/<REPO>@<REPO_ID>:ref:refs/heads/main` の形で発行された。
+> オーナーとリポジトリの**数値 ID（不変）**が名前の後ろに付く形式で、リポジトリを削除して同じ名前で作り直されても ID が変わるため、
+> 「同名リポジトリを作って他人のロールを引き受ける」攻撃を防げる。信頼ポリシーの sub も同じ形式にする必要があり、
+> bootstrap の `github_owner_id` / `github_repo_id` で設定している（空にすると従来形式）。
+> 最初は従来形式で作って `Not authorized to perform sts:AssumeRoleWithWebIdentity` になった。OIDC whoami で sub を表示して原因が分かった。
+> 背景: GitHub の変更（[Changelog 2026-04-23](https://github.blog/changelog/2026-04-23-immutable-subject-claims-for-github-actions-oidc-tokens)）で、
+> **2026-07-15 以降に作成・改名・移管されたリポジトリは自動でこの形式**になる。それ以前のリポジトリはリポジトリ／Organization の OIDC 設定で opt-in した場合のみ。
+> ID は `gh api repos/<OWNER>/<REPO> --jq '{id, owner_id: .owner.id}'` で確認できる（秘密情報ではない）。
 | `ref` / `event_name` / `actor` | `refs/heads/main` / `workflow_dispatch` / `<OWNER>` | 参考情報 |
 
 ## 3. ロールの分け方（最小権限）
@@ -143,7 +166,7 @@ GitHub はこのファイルに書かれたコミットのコードだけを実�
 
 | エラー | 原因と確認 |
 |---|---|
-| `Not authorized to perform sts:AssumeRoleWithWebIdentity` | 信頼ポリシーの sub と実際の sub が違う。OIDC whoami の `sub` 表示と、bootstrap の `github_repo` / `apply_environment` を見比べる。main 以外のブランチから実行していないか |
+| `Not authorized to perform sts:AssumeRoleWithWebIdentity` | 信頼ポリシーの sub と実際の sub が違う。OIDC whoami の `sub` 表示と、bootstrap の `github_repo` / `github_owner_id` / `github_repo_id` / `apply_environment` を見比べる（ID 付き形式かどうかに注意）。main 以外のブランチから実行していないか |
 | `Could not load credentials from any providers` | ワークフローに `permissions: id-token: write` が無い / Secrets 名の打ち間違い |
 | `No OpenIDConnect provider found` | OIDC プロバイダが無い。bootstrap を `create_github_oidc_provider = true` で apply |
 | `AccessDenied ... iam:CreateRole` など | apply ロールの権限不足。エラーに出たアクションを `terraform/bootstrap/main.tf` の apply ポリシーに追加して、手元PCで bootstrap を再 apply |
