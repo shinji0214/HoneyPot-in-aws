@@ -3,6 +3,9 @@
 docs/01 の手順に入る前に、1回だけ行う準備。所要時間の目安は 60〜90 分。
 AWS アカウント（ルートユーザーでログインできる状態）があることが前提。
 
+> このドキュメントは手順書と**学習メモ**を兼ねる。実際にやってみて分かったこと・つまずいたことは
+> 「📝 学習メモ」として各手順の近くに追記していく。未実施の部分は手順のみ。
+
 方針: **アクセスキー（長期の鍵）は作らない。**
 手元PCは IAM Identity Center の一時認証情報、GitHub Actions は OIDC の一時認証情報で AWS を操作する。
 
@@ -51,7 +54,11 @@ PC にずっと有効な鍵が残らないため（OIDC と同じ考え方）。
    `<USER>-admin` → 許可セット `AdministratorAccess`
 6. [ ] **MFA を必須にする**: 設定 → 認証 → 多要素認証 → 設定 → 「サインインのたびに」＋「MFA デバイスを登録するよう求める」
 7. [ ] **AWS アクセスポータルの URL を控える**: ダッシュボード右側の「設定の概要」、または 設定 → アイデンティティソース タブにある「AWS アクセスポータルの URL」（`https://d-xxxxxxxxxx.awsapps.com/start` の形。招待メールにも記載）
+   - 📝 URL は「デュアルスタック」「Regional IPv4」「IPv4 専用」の3つが表示されるが、どれも同じポータルの入口。
+     この手順では一番なじみのある **IPv4 専用（`https://d-xxxxxxxxxx.awsapps.com/start`）** を使う。ブックマーク推奨
 8. [ ] ブラウザのシークレットウィンドウでポータル URL を開き、`<USER>-admin` でログイン（MFA 登録）→ アカウント → AdministratorAccess → コンソールが開けば OK
+   - 📝 パスワードを聞かれるが、これは B-3 の招待メール（「Invitation to join AWS IAM Identity Center」）で
+     **自分で設定するもの**。メールが見つからなければ ユーザー → `<USER>-admin` → パスワードをリセット → メール送信 で再送できる
 
 以降、**コンソール作業もこのポータルから入る**。ルートユーザーは請求の最終確認以外では使わない。
 
@@ -80,6 +87,38 @@ terraform version      # 1.10 以上
 ```powershell
 aws configure sso
 ```
+
+#### 📝 学習メモ: `aws configure sso` は何をしているか
+
+一言でいうと「**PC の `aws` / `terraform` コマンドを、ブラウザでログインした `<USER>-admin` として動かせるようにする設定**」。
+
+- ブラウザはポータルにログインすればコンソールが使えるが、PowerShell の `aws` や `terraform` はそのログイン状態を知らない
+- よくある方法は IAM ユーザーのアクセスキー（ずっと有効な鍵）を PC に置くことだが、漏れると悪用され続けるので今回は使わない
+- 代わりにこのコマンドで、ブラウザのログインを CLI に橋渡しする
+
+やっていること:
+
+1. ポータル URL・リージョン・使うロール（AdministratorAccess）を `~/.aws/config` に `honeypot-admin` という名前（プロファイル）で保存する
+2. 途中でブラウザが開き、いつものポータルログイン（MFA）で「この PC に権限を渡していい？」を許可する
+3. 以後コマンドを打つと、裏で **数時間だけ有効な一時的な鍵** を自動でもらって使う（キャッシュは `~/.aws/sso/cache/`）
+
+```text
+PowerShell の aws/terraform
+   │ プロファイル honeypot-admin を使う
+   ▼
+~/.aws/config（ポータルURL・ロール名だけ。鍵は入っていない）
+   │ 一時的な鍵をください
+   ▼
+IAM Identity Center ── 初回／期限切れ時はブラウザでログイン＋MFA
+   │ 数時間で切れる一時認証情報
+   ▼
+AWS API（S3・IAM などを操作）
+```
+
+- 期限が切れたら `aws sso login --profile honeypot-admin` でまたブラウザ認証するだけ。PC に長期の鍵は残らない
+- GitHub Actions の OIDC（docs/07）と同じ「一時的な鍵だけ使う」考え方の、手元 PC 版
+- これが必要なのは、bootstrap（state 用 S3・OIDC ロールを作る最初の一回）だけは Actions ではなく手元の terraform で実行するため。
+  鶏と卵の問題で、Actions が AWS に入るためのロール自体をまず誰かが作る必要がある
 聞かれる内容:
 
 | 質問 | 入力 |
@@ -93,6 +132,11 @@ aws configure sso
 | Default client Region | `ap-northeast-1` |
 | CLI default output format | `json` |
 | Profile name | `honeypot-admin` |
+| Configure AWS skills and the AWS MCP server for your AI coding agent(s)? | `n`（下記メモ） |
+
+📝 最後の質問は「手元の AI エージェント（Claude Code など）に AWS 用のスキルと MCP サーバーを設定するか」。
+このプロファイルは AdministratorAccess なので、ここで設定するとエージェントが管理者権限で AWS を触れる状態になる。
+ログ分析で MCP を使う場合は docs/04 のとおり読み取り専用ポリシーの別プロファイルで後から設定する。
 
 確認:
 ```powershell
