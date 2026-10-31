@@ -1,0 +1,78 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "LogsInsightsOnHoneypotGroups",
+      "Effect": "Allow",
+      "Action": [
+        "logs:StartQuery",
+        "logs:FilterLogEvents",
+        "logs:GetLogEvents",
+        "logs:DescribeLogStreams",
+        "logs:GetLogGroupFields"
+      ],
+      "Resource": [
+        "arn:aws:logs:ap-northeast-1:ACCOUNT_ID:log-group:/honeypot/*",
+        "arn:aws:logs:ap-northeast-1:ACCOUNT_ID:log-group:aws-waf-logs-honeypot*"
+      ]
+    },
+    {
+      "Sid": "LogsReadGlobal",
+      "Effect": "Allow",
+      "Action": [
+        "logs:DescribeLogGroups",
+        "logs:GetQueryResults",
+        "logs:StopQuery",
+        "logs:DescribeQueries",
+        "logs:DescribeQueryDefinitions"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "GuardDutyRead",
+      "Effect": "Allow",
+      "Action": [
+        "guardduty:ListDetectors",
+        "guardduty:GetDetector",
+        "guardduty:ListFindings",
+        "guardduty:GetFindings",
+        "guardduty:GetFindingsStatistics"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "WafRead",
+      "Effect": "Allow",
+      "Action": [
+        "wafv2:ListWebACLs",
+        "wafv2:GetWebACL",
+        "wafv2:GetSampledRequests",
+        "wafv2:GetLoggingConfiguration"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "MetricsAndElbRead",
+      "Effect": "Allow",
+      "Action": [
+        "cloudwatch:GetMetricData",
+        "cloudwatch:GetMetricStatistics",
+        "cloudwatch:ListMetrics",
+        "elasticloadbalancing:DescribeLoadBalancers",
+        "elasticloadbalancing:DescribeTargetGroups",
+        "elasticloadbalancing:DescribeTargetHealth",
+        "ce:GetCostAndUsage"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "AlbLogsRead",
+      "Effect": "Allow",
+      "Action": ["s3:ListBucket", "s3:GetObject"],
+      "Resource": [
+        "arn:aws:s3:::honeypot-alb-logs-ACCOUNT_ID",
+        "arn:aws:s3:::honeypot-alb-logs-ACCOUNT_ID/*"
+      ]
+    }
+  ]
+}
