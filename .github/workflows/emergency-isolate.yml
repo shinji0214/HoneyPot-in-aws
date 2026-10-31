@@ -1,0 +1,54 @@
+# スマホから honeypot の EC2 を緊急隔離する（scripts/emergency-isolate.sh を実行）
+# 実行: GitHub → Actions → "Emergency isolate honeypot" → Run workflow → confirm に ISOLATE と入力
+# 事前設定: Settings → Secrets and variables → Actions → Variables に
+#           AWS_EMERGENCY_ROLE_ARN = terraform/base の output github_emergency_role_arn
+name: Emergency isolate honeypot
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: "誤操作防止: ISOLATE と入力"
+        required: true
+        type: string
+      snapshot:
+        description: "調査用の EBS スナップショットを取る"
+        required: false
+        type: boolean
+        default: true
+
+permissions:
+  id-token: write # OIDC で AWS ロールを引き受けるため
+  contents: read
+
+concurrency:
+  group: emergency-isolate
+  cancel-in-progress: false
+
+jobs:
+  isolate:
+    if: inputs.confirm == 'ISOLATE'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_EMERGENCY_ROLE_ARN }}
+          aws-region: ap-northeast-1
+
+      - name: Isolate and stop EC2
+        env:
+          SNAPSHOT: ${{ inputs.snapshot && '1' || '0' }}
+        run: |
+          chmod +x scripts/emergency-isolate.sh
+          ./scripts/emergency-isolate.sh
+
+      - name: Summary
+        if: always()
+        run: |
+          {
+            echo "## Emergency isolate: ${{ job.status }}"
+            echo "次は PC から: export-guardduty.sh / export-logs.sh で退避 → terraform destroy（docs/06）"
+          } >> "$GITHUB_STEP_SUMMARY"

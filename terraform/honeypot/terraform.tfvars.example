@@ -1,0 +1,12 @@
+# cp terraform.tfvars.example terraform.tfvars して必要なら編集
+
+instance_type = "t4g.nano"
+
+# true: マネージドルールを COUNT（検知のみ）で動かし、nginx まで全リクエストを届かせる
+waf_count_mode = false
+
+# true: EC2 の 80/tcp をインターネットへ直接公開（GuardDuty の PortProbe 系 Finding を狙う場合）
+expose_ec2_directly = false
+
+# 独自ドメイン + ACM 証明書がある場合のみ。空なら HTTP(80) のみ
+acm_certificate_arn = ""

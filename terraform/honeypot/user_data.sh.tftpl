@@ -1,0 +1,24 @@
+#!/bin/bash
+# EC2 初回起動時に実行される。ログ: /var/log/cloud-init-output.log
+set -euxo pipefail
+
+# 起動時点の最新パッチを当ててから入れる
+dnf -y upgrade
+dnf -y install nginx amazon-cloudwatch-agent
+
+# nginx 設定（config/nginx/nginx.conf をそのまま配置）
+cat > /etc/nginx/nginx.conf <<'NGINX_CONF_EOF'
+${nginx_conf}
+NGINX_CONF_EOF
+
+nginx -t
+systemctl enable --now nginx
+
+# CloudWatch Agent 設定（config/cloudwatch-agent/config.json.tftpl から生成）
+cat > /opt/aws/amazon-cloudwatch-agent/etc/honeypot.json <<'CWAGENT_EOF'
+${cwagent_json}
+CWAGENT_EOF
+
+/opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-ctl \
+  -a fetch-config -m ec2 -s \
+  -c file:/opt/aws/amazon-cloudwatch-agent/etc/honeypot.json
