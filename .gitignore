@@ -1,0 +1,15 @@
+# Terraform
+**/.terraform/
+*.tfstate
+*.tfstate.*
+*.tfvars
+!*.tfvars.example
+crash.log
+.terraform.lock.hcl.bak
+
+# 取得したログ・Findings（攻撃者IPやペイロードを含むので公開リポジトリに載せない）
+exports/
+
+# 認証情報
+.env
+*.pem
