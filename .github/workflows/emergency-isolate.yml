@@ -1,8 +1,8 @@
 # スマホから honeypot の EC2 を緊急隔離する（scripts/emergency-isolate.sh を実行）
-# 実行: GitHub → Actions → "Emergency isolate honeypot" → Run workflow → confirm に ISOLATE と入力
+# 実行: GitHub → Actions → "緊急隔離（Emergency isolate）" → Run workflow → confirm に ISOLATE と入力
 # 事前設定: Settings → Secrets and variables → Actions → Secrets に
 #           AWS_EMERGENCY_ROLE_ARN = terraform/bootstrap の output emergency_role_arn（docs/07）
-name: Emergency isolate honeypot
+name: 緊急隔離（Emergency isolate）
 
 on:
   workflow_dispatch:

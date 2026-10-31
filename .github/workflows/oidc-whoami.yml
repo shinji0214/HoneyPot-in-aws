@@ -1,8 +1,8 @@
 # OIDC の学習・動作確認用。AWS には何も作らない。
 #   1. GitHub が発行する OIDC トークンの中身（クレーム）を表示する ※トークン本体は表示しない
 #   2. そのトークンで plan ロールを引き受け、aws sts get-caller-identity で「誰として入れたか」を表示する
-# 実行: Actions → "OIDC whoami" → Run workflow（main ブランチ）
-name: OIDC whoami
+# 実行: Actions → "接続確認（OIDC whoami）" → Run workflow（main ブランチ）
+name: 接続確認（OIDC whoami）
 
 on:
   workflow_dispatch:
