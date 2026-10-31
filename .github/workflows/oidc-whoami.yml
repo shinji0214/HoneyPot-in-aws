@@ -28,7 +28,7 @@ jobs:
           echo "$PAYLOAD" | base64 -d | jq '{iss, aud, sub, repository, ref, environment, event_name, workflow_ref, actor, exp, iat}' \
             | tee -a "$GITHUB_STEP_SUMMARY"
 
-      - uses: aws-actions/configure-aws-credentials@v4
+      - uses: aws-actions/configure-aws-credentials@v4.3.1
         with:
           role-to-assume: ${{ secrets.AWS_PLAN_ROLE_ARN }}
           aws-region: ap-northeast-1
