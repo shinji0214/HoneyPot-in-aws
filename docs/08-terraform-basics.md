@@ -146,3 +146,35 @@ data "aws_s3_bucket" "alb_logs" {
 
 - `data` は「作らずに既存のものを読むだけ」。base が先に存在しないとエラーになる（base → honeypot の順になる理由）
 - base と honeypot で `project` の値を揃える必要があるのはこのため
+
+## 9. 作ったリソースをコード内で「変数みたいに」参照できる
+
+`resource "型" "名前" {}` で作ったものは、同じフォルダのコードから `型.名前.属性` で値を参照できる。
+（同じフォルダで作っていないもの＝別スタックや手で作ったものは `data` で探して読む）
+
+例: `terraform/bootstrap/main.tf` の state 用バケット
+
+```hcl
+resource "aws_s3_bucket" "tfstate" {
+  bucket = local.state_bucket
+}
+
+# 同じバケットの設定（対象指定に .id を使う）
+resource "aws_s3_bucket_versioning" "tfstate" {
+  bucket = aws_s3_bucket.tfstate.id
+  ...
+}
+
+# apply ロールに「このバケットだけ読み書き可」を許可するポリシー（.arn を使う）
+resources = [aws_s3_bucket.tfstate.arn]
+
+# outputs.tf でバケット名を外に出す（.bucket を使う）
+output "tf_state_bucket" {
+  value = aws_s3_bucket.tfstate.bucket
+}
+```
+
+- plan の時点ではまだ AWS に無いので、ARN などは `(known after apply)` と表示される。
+  apply で作られて AWS が値を返した瞬間に確定し、それを参照している後続のリソースに自動で流し込まれる
+- この参照があるので Terraform は「バケット → それを参照するポリシー」の順に作ると自動で判断する（実行順を書かなくていい理由）
+- 確定した値は state に保存されるので、次回以降の plan / output でも使える
