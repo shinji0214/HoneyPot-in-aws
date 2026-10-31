@@ -19,6 +19,7 @@ VPC 10.100.0.0/16（Peering / TGW / VPN なし、出口は IGW のみ）
 
 | 順 | ファイル | 内容 |
 |---|---|---|
+| 0 | [docs/00-aws-account-setup.md](docs/00-aws-account-setup.md) | AWS アカウントの初期設定（MFA、Identity Center の管理者ユーザー、Windows のツール） |
 | 1 | [docs/01-runbook.md](docs/01-runbook.md) | 事前準備 → 構築 → 動作確認 → 観測中にやること |
 | 2 | [docs/02-cost-estimate.md](docs/02-cost-estimate.md) | 費用見積もりと予算の見張り方 |
 | 3 | [docs/03-teardown-checklist.md](docs/03-teardown-checklist.md) | 2段階の撤収チェックリスト |

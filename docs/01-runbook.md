@@ -6,14 +6,11 @@
 
 ## 0. 事前準備（構築日より前、できれば今夜）
 
-- [ ] **Cost Explorer を有効化**（初回は反映まで最大24時間かかる）: Billing and Cost Management → Cost Explorer → 有効化
-- [ ] ルートユーザーに MFA、手元PCの作業は IAM Identity Center（または IAM ユーザー）の管理者プロファイルで行う
-- [ ] 手元PCに以下をインストール
-  - AWS CLI v2（`aws --version`）
-  - Session Manager プラグイン（`session-manager-plugin --version`）
-  - Terraform 1.10 以上（`terraform version`。S3 だけで state ロックする `use_lockfile` を使うため）
-  - jq、python3、（MCPを使うなら）uv
-- [ ] `aws sts get-caller-identity --profile <管理者プロファイル>` が通る
+AWS アカウントの初期設定（ルートの MFA、請求情報へのアクセス許可、Identity Center の管理者ユーザー、手元PCのツールと
+`aws configure sso`）は [docs/00-aws-account-setup.md](00-aws-account-setup.md) にまとめてある。まずそれを終わらせる。
+
+- [ ] docs/00 の A〜C が完了し、`aws sts get-caller-identity --profile honeypot-admin` が通る
+- [ ] Cost Explorer を有効化済み（docs/00 の A。初回は反映まで最大24時間かかる）
 - [ ] GuardDuty が既に有効か確認: `aws guardduty list-detectors --region ap-northeast-1`
   - 何か返ってきたら、GitHub の Variables で `ENABLE_GUARDDUTY = false`（手順2）
   - 初めて有効化するなら30日間の無料トライアル対象
@@ -36,7 +33,7 @@ cd HoneyPot-in-aws
 仕組みの説明は [docs/07-github-actions-oidc.md](07-github-actions-oidc.md)。
 
 ```bash
-export AWS_PROFILE=<管理者プロファイル>
+export AWS_PROFILE=honeypot-admin     # PowerShell なら $env:AWS_PROFILE = "honeypot-admin"
 cd terraform/bootstrap
 terraform init
 terraform apply      # OIDC プロバイダが既にあるアカウントなら -var create_github_oidc_provider=false
