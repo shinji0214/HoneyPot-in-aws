@@ -4,27 +4,27 @@
 version: 'v0.0.3'
 workflows:
     '.github/workflows/emergency-isolate.yml':
-        - 'actions/checkout@v4.4.0'
-        - 'aws-actions/configure-aws-credentials@v4.3.1'
+        - 'actions/checkout@v7.0.1'
+        - 'aws-actions/configure-aws-credentials@v6.3.0'
     '.github/workflows/oidc-whoami.yml':
-        - 'aws-actions/configure-aws-credentials@v4.3.1'
+        - 'aws-actions/configure-aws-credentials@v6.3.0'
     '.github/workflows/terraform.yml':
-        - 'actions/checkout@v4.4.0'
-        - 'aws-actions/configure-aws-credentials@v4.3.1'
-        - 'hashicorp/setup-terraform@v3.1.2'
+        - 'actions/checkout@v7.0.1'
+        - 'aws-actions/configure-aws-credentials@v6.3.0'
+        - 'hashicorp/setup-terraform@v4.0.1'
 dependencies:
-    'actions/checkout@v4.4.0':
-        ref: 'v4.4.0'
-        commit: 'sha1-11d5960a326750d5838078e36cf38b85af677262'
+    'actions/checkout@v7.0.1':
+        ref: 'v7.0.1'
+        commit: 'sha1-3d3c42e5aac5ba805825da76410c181273ba90b1'
         owner_id: 44036562
         repo_id: 197814629
-    'aws-actions/configure-aws-credentials@v4.3.1':
-        ref: 'v4.3.1'
-        commit: 'sha1-7474bc4690e29a8392af63c5b98e7449536d5c3a'
+    'aws-actions/configure-aws-credentials@v6.3.0':
+        ref: 'v6.3.0'
+        commit: 'sha1-e1253824e5c10ff9df46874f81ed3ec929e19cfd'
         owner_id: 57468012
         repo_id: 220391287
-    'hashicorp/setup-terraform@v3.1.2':
-        ref: 'v3.1.2'
-        commit: 'sha1-b9cd54a3c349d3f38e8881555d616ced269862dd'
+    'hashicorp/setup-terraform@v4.0.1':
+        ref: 'v4.0.1'
+        commit: 'sha1-dfe3c3f87815947d99a8997f908cb6525fc44e9e'
         owner_id: 761456
         repo_id: 258271226
