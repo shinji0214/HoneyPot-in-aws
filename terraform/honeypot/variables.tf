@@ -22,7 +22,7 @@ variable "azs" {
 }
 
 variable "instance_type" {
-  description = "t4g.nano（512MB）で nginx + CloudWatch Agent は動く。不安なら t4g.micro"
+  description = "t4g.nano（512MB）。dnf 実行時のメモリ不足対策に user_data で 1GB スワップを作る。不安なら t4g.micro"
   type        = string
   default     = "t4g.nano"
 }

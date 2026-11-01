@@ -2,6 +2,16 @@
 # EC2 初回起動時に実行される。ログ: /var/log/cloud-init-output.log
 set -euxo pipefail
 
+# t4g.nano（メモリ512MB）では dnf のリポジトリ情報の読み込みでメモリが足りず
+# OOM Killer に dnf が kill される（2026-11 リハーサルで発生）。先に 1GB のスワップを作る
+if ! swapon --show | grep -q /swapfile; then
+  dd if=/dev/zero of=/swapfile bs=1M count=1024
+  chmod 600 /swapfile
+  mkswap /swapfile
+  swapon /swapfile
+  echo '/swapfile none swap sw 0 0' >> /etc/fstab
+fi
+
 # 起動時点の最新パッチを当ててから入れる
 dnf -y upgrade
 dnf -y install nginx amazon-cloudwatch-agent

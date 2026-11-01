@@ -112,6 +112,11 @@ GitHub リポジトリ → Settings で以下を設定する。
 - base の plan が `InvalidBucketName`（バケット名の先頭に `\ufeff`）で失敗 → Windows PowerShell で `terraform output | gh secret set` とパイプで渡すと BOM が付く。
   `gh secret set 名前 --body (terraform output -raw 名前)` で登録し直して解決
 - Actions のログに `Node.js 20 is deprecated` の警告 → 動作には影響なし。観測後に Dependabot の更新 PR で最新化する
+- honeypot apply 後、curl が 15 分たっても `502 Bad Gateway` → Session Manager で `/var/log/cloud-init-output.log` を見ると
+  `dnf -y upgrade` が `Killed` で止まっていた。t4g.nano（メモリ 512MB）では dnf がメモリ不足で OOM Killer に止められる。
+  user_data でスワップ 1GB を先に作るよう修正して解決
+  - 📝 502 は「ALB は動いているが、後ろの EC2 から応答が無い」の意味（`Server: awselb/2.0` なので ALB が返している）。
+    ALB → ターゲットグループ → EC2 の中（cloud-init のログ）の順に、手前から原因を追う
 
 ## 3. 構築（GitHub Actions）
 
