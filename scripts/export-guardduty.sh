@@ -20,7 +20,13 @@ aws guardduty list-findings --region "$REGION" --detector-id "$DETECTOR_ID" \
   --query 'FindingIds' --output text | tr '\t' '\n' | sed '/^$/d' > "$OUT_DIR/finding_ids.txt"
 COUNT=$(wc -l < "$OUT_DIR/finding_ids.txt")
 echo "findings: $COUNT"
-[[ "$COUNT" -eq 0 ]] && { echo "Finding がありません（コンソールの『サンプル結果の生成』で学習用サンプルは作れます）"; exit 0; }
+if [[ "$COUNT" -eq 0 ]]; then
+  # 0件だったことも記録として残す（findings.json が無いと「未実行」と区別できないため）
+  echo '[]' > "$OUT_DIR/findings.json"
+  echo "Finding がありません（コンソールの『サンプル結果の生成』で学習用サンプルは作れます）"
+  echo "保存しました: $OUT_DIR/findings.json（空配列）"
+  exit 0
+fi
 
 # get-findings は1回50件まで
 rm -f "$OUT_DIR"/chunks/*.json
